@@ -1,20 +1,23 @@
-
-export interface IContentRecordDAC {
-  recordNewContent(content: IContentInfo): Promise<IDACResponse>;
-  recordInteraction(content: IContentInfo): Promise<IDACResponse>;
+export interface IUserProfileDAC {
+  createNewProfile(content: IUserProfile): Promise<IDACResponse>;
+  updateProfile(content: IUserProfile): Promise<IDACResponse>;
 }
 
-export interface IContentInfo {
-  skylink: string;    // skylink
-  metadata: object;   // should be valid JSON
+export interface IUserProfile {
+  username: string,
+  aboutme?: string,
+  location?: string,
+  tags?: any[],
+  avatar?: any[]
 }
 
-export interface IContentPersistence {
+export interface IUserProfilePersistence {
   timestamp: number;  // unix timestamp of recording
+  version: number;
 }
 
-export interface INewContentPersistence extends IContentPersistence { }
-export interface IInteractionPersistence extends IContentPersistence { }
+export interface ICreateProfilePersistence extends IUserProfilePersistence { }
+export interface IUpdateProfilePersistence extends IUserProfilePersistence { }
 
 export interface IIndex {
   version: number;
@@ -44,8 +47,8 @@ export interface IDACResponse {
 }
 
 export enum EntryType {
-  'NEWCONTENT',
-  'INTERACTIONS'
+  'CREATEPROFILE',
+  'UPDATEPROFILE'
 }
 
 // NOTE: the values contained by this interface are 'static', meaning they won't
@@ -55,11 +58,10 @@ export enum EntryType {
 // e.g. const { NC_INDEX_PATH } = this.paths;
 export interface IFilePaths {
   SKAPPS_DICT_PATH: string;
-
+  PROFILE_PATH: string;
   NC_INDEX_PATH: string;
   NC_PAGE_PATH: string;
 
   CI_INDEX_PATH: string;
   CI_PAGE_PATH: string;
 }
-    

@@ -1,5 +1,5 @@
-import ContentRecordDAC from "./dac";
+import UserProfileDAC from "./dac";
 
 (async () => {
-  new ContentRecordDAC();
+  new UserProfileDAC();
 })();
