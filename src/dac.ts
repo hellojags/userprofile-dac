@@ -4,7 +4,7 @@ import { ChildHandshake, Connection, WindowMessenger } from "post-me";
 import { IUserProfile, IIndex, IPage, IUserProfilePersistence, ICreateProfilePersistence, EntryType, IDACResponse, IDictionary, IUserProfileDAC, IFilePaths } from "./types";
 
 // DAC consts
-const DATA_DOMAIN = "crqa.hns";
+const DATA_DOMAIN = "skyuser.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
@@ -44,6 +44,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       onUserLogin: this.onUserLogin.bind(this),
       createNewProfile: this.createNewProfile.bind(this),
       updateProfile: this.updateProfile.bind(this),
+      getProfile: this.getProfile.bind(this),
     };
 
     // create connection
@@ -55,6 +56,17 @@ export default class UserProfileDAC implements IUserProfileDAC {
       }),
       methods,
     );
+  }
+  public async getProfile(data:any): Promise<any> {
+    try { 
+      // purposefully not awaited
+      return this.handleGetProfile()
+      
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+      return { error: error }
+    }
+    
   }
   public async createNewProfile(data: IUserProfile): Promise<IDACResponse> {
     try { 
@@ -77,6 +89,8 @@ export default class UserProfileDAC implements IUserProfileDAC {
     return { submitted: true }
   }
 
+
+
   public async init() {
     try {
       // extract the skappname and use it to set the filepaths
@@ -89,10 +103,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       this.paths = {
         SKAPPS_DICT_PATH: `${DATA_DOMAIN}/skapps.json`,
         PROFILE_PATH: `${DATA_DOMAIN}/profile.json`,
-        NC_INDEX_PATH: `${DATA_DOMAIN}/${skapp}/newcontent/index.json`,
-        NC_PAGE_PATH: `${DATA_DOMAIN}/${skapp}/newcontent/page_[NUM].json`,
-        CI_INDEX_PATH: `${DATA_DOMAIN}/${skapp}/interactions/index.json`,
-        CI_PAGE_PATH: `${DATA_DOMAIN}/${skapp}/interactions/page_[NUM].json`,
+
       }
 
       // load mysky
@@ -124,6 +135,11 @@ export default class UserProfileDAC implements IUserProfileDAC {
       await Promise.all([
         this.updateFile(PROFILE_PATH, data)
       ]);
+  }
+
+  private async handleGetProfile() {
+    const { PROFILE_PATH } = this.paths;
+      return await this.downloadFile(PROFILE_PATH)
   }
 
   // downloadFile merely wraps getJSON but is typed in a way that avoids

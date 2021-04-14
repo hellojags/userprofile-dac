@@ -1,6 +1,7 @@
 export interface IUserProfileDAC {
   createNewProfile(content: IUserProfile): Promise<IDACResponse>;
   updateProfile(content: IUserProfile): Promise<IDACResponse>;
+  getProfile(data:any): Promise<any>;
 }
 
 export interface IUserProfile {
@@ -59,9 +60,4 @@ export enum EntryType {
 export interface IFilePaths {
   SKAPPS_DICT_PATH: string;
   PROFILE_PATH: string;
-  NC_INDEX_PATH: string;
-  NC_PAGE_PATH: string;
-
-  CI_INDEX_PATH: string;
-  CI_PAGE_PATH: string;
 }
