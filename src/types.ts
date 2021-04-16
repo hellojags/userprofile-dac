@@ -4,10 +4,11 @@ export interface IUserProfileDAC {
   getProfile(data:any): Promise<any>;
 }
 
-export interface IUserProfile {
+export interface IUserProfile { 
   username: string,
   aboutme?: string,
   location?: string,
+  preferance?:any,
   tags?: any[],
   avatar?: any[]
 }
