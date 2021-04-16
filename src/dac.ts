@@ -45,6 +45,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       createNewProfile: this.createNewProfile.bind(this),
       updateProfile: this.updateProfile.bind(this),
       getProfile: this.getProfile.bind(this),
+      getProfileHistory: this.getProfileHistory.bind(this),
     };
 
     // create connection
@@ -58,6 +59,17 @@ export default class UserProfileDAC implements IUserProfileDAC {
     );
   }
   public async getProfile(data:any): Promise<any> {
+    try { 
+      // purposefully not awaited
+      return this.handleGetProfile()
+      
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+      return { error: error }
+    }
+    
+  }
+  public async getProfileHistory(data:any): Promise<any> {
     try { 
       // purposefully not awaited
       return this.handleGetProfile()
@@ -101,8 +113,8 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
 
       this.paths = {
-        SKAPPS_DICT_PATH: `${DATA_DOMAIN}/skapps.json`,
-        PROFILE_PATH: `${DATA_DOMAIN}/profile.json`,
+        PROFILE_HISTORY_PATH: `${DATA_DOMAIN}/profile/updatelog.json`,
+        PROFILE_PATH: `${DATA_DOMAIN}/skapps-profile.json`,
 
       }
 
@@ -131,8 +143,21 @@ export default class UserProfileDAC implements IUserProfileDAC {
   // handleNewEntries is called by both 'recordNewContent' and
   // 'recordInteraction' and handles the given entry accordingly.
   private async handleNewEntries(kind: EntryType, data: IUserProfile) {
-    const { PROFILE_PATH } = this.paths;
+    const { PROFILE_HISTORY_PATH,PROFILE_PATH } = this.paths;
+    let updateLog:any = this.handleGetProfileHistory();
+    let log = {
+      updatedBy:this.skapp,
+      timestamp: new Date()
+    }
+    if(updateLog!=null && updateLog != undefined && updateLog.history != null && updateLog.history != undefined){
+      updateLog.history.push(log);
+    }else{
+      updateLog={
+        history:[log]
+      }
+    }
       await Promise.all([
+        this.updateFile(PROFILE_HISTORY_PATH, updateLog),
         this.updateFile(PROFILE_PATH, data)
       ]);
   }
@@ -140,6 +165,11 @@ export default class UserProfileDAC implements IUserProfileDAC {
   private async handleGetProfile() {
     const { PROFILE_PATH } = this.paths;
       return await this.downloadFile(PROFILE_PATH)
+  }
+
+  private async handleGetProfileHistory() {
+    const { PROFILE_HISTORY_PATH } = this.paths;
+      return await this.downloadFile(PROFILE_HISTORY_PATH)
   }
 
   // downloadFile merely wraps getJSON but is typed in a way that avoids

@@ -58,6 +58,6 @@ export enum EntryType {
 //
 // e.g. const { NC_INDEX_PATH } = this.paths;
 export interface IFilePaths {
-  SKAPPS_DICT_PATH: string;
+  PROFILE_HISTORY_PATH: string;
   PROFILE_PATH: string;
 }
