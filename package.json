@@ -1,5 +1,5 @@
 {
-  "name": "@kbiswas/userprofile-record-library",
+  "name": "userprofile-record-dac",
   "version": "0.1.0",
   "description": "",
   "main": "src/index.ts",
