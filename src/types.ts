@@ -48,9 +48,11 @@ export interface IDACResponse {
   error?: string;
 }
 
+
 export enum EntryType {
   'CREATEPROFILE',
-  'UPDATEPROFILE'
+  'UPDATEPROFILE',
+  'UPDATEPREF'
 }
 
 // NOTE: the values contained by this interface are 'static', meaning they won't
@@ -59,6 +61,7 @@ export enum EntryType {
 //
 // e.g. const { NC_INDEX_PATH } = this.paths;
 export interface IFilePaths {
-  PROFILE_HISTORY_PATH: string;
+  PREF_PATH: string;
   PROFILE_PATH: string;
+  INDEX: string;
 }

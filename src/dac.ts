@@ -1,7 +1,7 @@
 import { Buffer } from "buffer"
 import { SkynetClient, MySky, JsonData } from "skynet-js";
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
-import { IUserProfile, IIndex, IPage, IUserProfilePersistence, ICreateProfilePersistence, EntryType, IDACResponse, IDictionary, IUserProfileDAC, IFilePaths } from "./types";
+import { IUserProfile, EntryType, IDACResponse, IUserProfileDAC, IFilePaths } from "./types";
 
 // DAC consts
 const DATA_DOMAIN = "skyuser.hns";
@@ -10,21 +10,6 @@ const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
 const DEV_ENABLED = urlParams.get('dev') === "true";
 
-// page consts
-const ENTRY_MAX_SIZE = 1 << 12; // 4kib
-const PAGE_REF = '[NUM]';
-
-// index consts
-const INDEX_DEFAULT_PAGE_SIZE = 1000;
-const INDEX_VERSION = 1;
-
-// ContentRecordDAC is a DAC that allows recording user interactions with pieces
-// of content. There are two types of interactions which are:
-// - content creation
-// - content interaction (can be anything)
-//
-// The DAC will store these interactions across a fanout data structure that
-// consists of an index file that points to multiple page files.
 export default class UserProfileDAC implements IUserProfileDAC {
   protected connection: Promise<Connection>;
 
@@ -46,6 +31,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
       updateProfile: this.updateProfile.bind(this),
       getProfile: this.getProfile.bind(this),
       getProfileHistory: this.getProfileHistory.bind(this),
+      updatePreferance: this.updatePreferance.bind(this),
+      getPreferance: this.getPreferance.bind(this),
+      getPrefHistory: this.getPrefHistory.bind(this),
     };
 
     // create connection
@@ -58,10 +46,59 @@ export default class UserProfileDAC implements IUserProfileDAC {
       methods,
     );
   }
+
+  /**
+   * This method is used to retrive last saved users profile information globaly. accross all skapps using this dac
+   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @returns Promise<any> the last saved users profile data
+   */
   public async getProfile(data:any): Promise<any> {
     try { 
-      // purposefully not awaited
       return this.handleGetProfile()
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+      return { error: error }
+    } 
+  }
+  /**
+   * This method is used to retrive last saved users preferance information globaly. accross all skapps using this dac
+   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @returns Promise<any> the last saved users preferance data
+   */
+  public async getPreferance(data:any): Promise<any> {
+    try { 
+      return this.handleGetPreferance() 
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+      return { error: error }
+    } 
+  }
+
+  /**
+   * This method is used to save users preferance information globaly. accross all skapps using this dac
+   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @returns Promise<any> success /error status
+   */
+  public async setPreferance(data:any): Promise<any> {
+    try { 
+      // purposefully not awaited
+      return this.handleGetProfile();
+      
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+      return { error: error }
+    } 
+  }
+
+    /**
+   * This method is used to retrive users profile information update History. accross all skapps using this dac
+   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @returns Promise<any> the profile data update history
+   */
+  public async getProfileHistory(data:any): Promise<any> {
+    try { 
+      // purposefully not awaited
+      return this.handleGetPreferanceHistory();
       
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
@@ -69,10 +106,16 @@ export default class UserProfileDAC implements IUserProfileDAC {
     }
     
   }
-  public async getProfileHistory(data:any): Promise<any> {
+
+      /**
+   * This method is used to retrive users preferance information update History. accross all skapps using this dac
+   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @returns Promise<any> the preferance data update history
+   */
+  public async getPrefHistory(data:any): Promise<any> {
     try { 
       // purposefully not awaited
-      return this.handleGetProfile()
+      return this.handleGetPreferanceHistory();
       
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
@@ -82,9 +125,8 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
   public async createNewProfile(data: IUserProfile): Promise<IDACResponse> {
     try { 
-      // purposefully not awaited
-      this.handleNewEntries(EntryType.CREATEPROFILE, data)
-      
+      this.handleProfileUpdate(data);
+      this.handleNewEntries(EntryType.CREATEPROFILE, data) 
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }
@@ -92,9 +134,19 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
   public async updateProfile(data: IUserProfile): Promise<IDACResponse> {
     try { 
-      // purposefully not awaited
+      this.handleProfileUpdate(data);
       this.handleNewEntries(EntryType.UPDATEPROFILE, data)
-      
+    } catch(error) {
+      this.log('Error occurred trying to record new content, err: ', error)
+    }
+    return { submitted: true }
+  }
+
+  
+  public async updatePreferance(data: IUserProfile): Promise<IDACResponse> {
+    try { 
+      this.handlePrefUpdate(data);
+      this.handleNewEntries(EntryType.UPDATEPREF, data)
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }
@@ -108,14 +160,15 @@ export default class UserProfileDAC implements IUserProfileDAC {
       // extract the skappname and use it to set the filepaths
       const hostname = new URL(document.referrer).hostname
       const skapp = await this.client.extractDomain(hostname)
+      this.log("loaded from hostname", hostname)
       this.log("loaded from skapp", skapp)
       this.skapp = skapp;
 
 
       this.paths = {
-        PROFILE_HISTORY_PATH: `${DATA_DOMAIN}/profile/updatelog.json`,
-        PROFILE_PATH: `${DATA_DOMAIN}/skapps-profile.json`,
-
+        PREF_PATH: `${DATA_DOMAIN}/${skapp}/global-preference.json`,
+        PROFILE_PATH: `${DATA_DOMAIN}/user-profile.json`,
+        INDEX: `${DATA_DOMAIN}/index.json`
       }
 
       // load mysky
@@ -140,36 +193,84 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
 
 
-  // handleNewEntries is called by both 'recordNewContent' and
-  // 'recordInteraction' and handles the given entry accordingly.
   private async handleNewEntries(kind: EntryType, data: IUserProfile) {
-    const { PROFILE_HISTORY_PATH,PROFILE_PATH } = this.paths;
-    let updateLog:any = this.handleGetProfileHistory();
-    let log = {
+    const { INDEX } = this.paths;
+    let indexRecord:any = this.handleGetIndex();
+    if(indexRecord!=null && indexRecord != undefined && indexRecord.history != null && indexRecord.history != undefined){
+      indexRecord ={
+      profile:'',
+      preferance:'',
+      profilehistory:[],
+      prefhistory:[]
+      }
+    
+    }
+
+    let updateLog = {
       updatedBy:this.skapp,
       timestamp: new Date()
     }
-    if(updateLog!=null && updateLog != undefined && updateLog.history != null && updateLog.history != undefined){
-      updateLog.history.push(log);
-    }else{
-      updateLog={
-        history:[log]
+      switch(kind){
+        case EntryType.CREATEPROFILE:
+        case EntryType.UPDATEPROFILE:
+          indexRecord.profile=this.skapp;
+          indexRecord.profilehistory.push(updateLog);
+          break;
+        case EntryType.UPDATEPREF:
+          indexRecord.preferance=this.skapp;
+          indexRecord.prefhistory.push(updateLog);
+          break;
+        default:
+          this.log('No case found for kind ',kind);
       }
-    }
       await Promise.all([
-        this.updateFile(PROFILE_HISTORY_PATH, updateLog),
-        this.updateFile(PROFILE_PATH, data)
+        this.updateFile(INDEX, indexRecord),
       ]);
   }
 
-  private async handleGetProfile() {
+  private async handleProfileUpdate(data:any){
     const { PROFILE_PATH } = this.paths;
-      return await this.downloadFile(PROFILE_PATH)
+    await this.updateFile(PROFILE_PATH, data)
   }
 
-  private async handleGetProfileHistory() {
-    const { PROFILE_HISTORY_PATH } = this.paths;
-      return await this.downloadFile(PROFILE_HISTORY_PATH)
+  private async handlePrefUpdate(data:any){
+    const { PREF_PATH } = this.paths;
+    await this.updateFile(PREF_PATH, data)
+  }
+
+  private async handleGetProfile() { 
+    let lastSkapp = this.handleGetLastestProfileSkapp();
+    const LATEST_PROFILE_PATH =`${DATA_DOMAIN}/${lastSkapp}/user-profile.json`;
+      return await this.downloadFile(LATEST_PROFILE_PATH);
+  }
+
+  private async handleGetPreferance() { 
+    let lastSkapp = this.handleGetLastestPrefSkapp();
+    const LATEST_PREF_PATH =`${DATA_DOMAIN}/${lastSkapp}/user-profile.json`;
+      return await this.downloadFile(LATEST_PREF_PATH);
+  }
+
+  private async handleGetIndex() {
+    const { INDEX } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX);
+      return indexData.profilehistory;
+  }
+
+  private async handleGetLastestProfileSkapp():Promise<string> {
+    const { INDEX } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX);
+      return indexData.profile;
+  }
+  private async handleGetLastestPrefSkapp():Promise<string> {
+    const { INDEX } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX);
+      return indexData.preferance;
+  }
+
+  private async handleGetPreferanceHistory() {
+    const { INDEX } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX);
+      return indexData.prefhistory;
   }
 
   // downloadFile merely wraps getJSON but is typed in a way that avoids
@@ -201,20 +302,6 @@ export default class UserProfileDAC implements IUserProfileDAC {
       await this.downloadFile(PROFILE_PATH)
   }
 
-  // toPersistence turns content info into a content persistence object [Need to Impliment this]
-  private toPersistence(data: IUserProfile): IUserProfilePersistence {
-    const persistence = {
-      timestamp: Math.floor(Date.now() / 1000),
-      version: 1,
-      ...data
-    }
-  // validate the given data does not exceed max size
-    const size = Buffer.from(JSON.stringify(persistence)).length
-    if (size > ENTRY_MAX_SIZE) {
-      throw new Error(`Entry exceeds max size, ${length}>${ENTRY_MAX_SIZE}`)
-    }
-    return persistence;
-  }
   // log prints to stdout only if DEBUG_ENABLED flag is set
   private log(message: string, ...optionalContext: any[]) {
     if (DEBUG_ENABLED) {
