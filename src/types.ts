@@ -63,5 +63,6 @@ export enum EntryType {
 export interface IFilePaths {
   PREF_PATH: string;
   PROFILE_PATH: string;
-  INDEX: string;
+  INDEX_PROFILE: string;
+  INDEX_PREFERANCE: string;
 }

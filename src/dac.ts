@@ -98,7 +98,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   public async getProfileHistory(data:any): Promise<any> {
     try { 
       // purposefully not awaited
-      return this.handleGetPreferanceHistory();
+      return this.handleGetProfileHistory();
       
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
@@ -167,8 +167,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
       this.paths = {
         PREF_PATH: `${DATA_DOMAIN}/${skapp}/global-preference.json`,
-        PROFILE_PATH: `${DATA_DOMAIN}/user-profile.json`,
-        INDEX: `${DATA_DOMAIN}/index.json`
+        PROFILE_PATH: `${DATA_DOMAIN}/${skapp}/user-profile.json`,
+        INDEX_PROFILE: `${DATA_DOMAIN}/index_profile.json`,
+        INDEX_PREFERANCE: `${DATA_DOMAIN}/index_preferance.json`
       }
 
       // load mysky
@@ -191,20 +192,19 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
   }
 
-
+private getBlankIndex(){
+  return      {
+    profile:'',
+    preferance:'',
+    profilehistory:[],
+    prefhistory:[]
+  
+  }
+}
 
   private async handleNewEntries(kind: EntryType, data: IUserProfile) {
-    const { INDEX } = this.paths;
-    let indexRecord:any = this.handleGetIndex();
-    if(indexRecord!=null && indexRecord != undefined && indexRecord.history != null && indexRecord.history != undefined){
-      indexRecord ={
-      profile:'',
-      preferance:'',
-      profilehistory:[],
-      prefhistory:[]
-      }
-    
-    }
+    const { INDEX_PROFILE,INDEX_PREFERANCE } = this.paths;
+    let indexRecord:any = {} 
 
     let updateLog = {
       updatedBy:this.skapp,
@@ -213,19 +213,33 @@ export default class UserProfileDAC implements IUserProfileDAC {
       switch(kind){
         case EntryType.CREATEPROFILE:
         case EntryType.UPDATEPROFILE:
+          indexRecord= await this.handleGetIndex("PROFILE");
+          if(indexRecord==null || indexRecord == undefined ){
+            indexRecord = this.getBlankIndex();
+          }
           indexRecord.profile=this.skapp;
+          if(indexRecord.profilehistory==null){
+            indexRecord.profilehistory=[]
+          }
           indexRecord.profilehistory.push(updateLog);
+          this.updateFile(INDEX_PROFILE, indexRecord)
           break;
         case EntryType.UPDATEPREF:
+          indexRecord= await this.handleGetIndex("PREFERENCE");
+    if(indexRecord==null || indexRecord == undefined ){
+      indexRecord =this. getBlankIndex();    
+    }
           indexRecord.preferance=this.skapp;
+          if(indexRecord.prefhistory==null){
+            indexRecord.prefhistory=[]
+          }
           indexRecord.prefhistory.push(updateLog);
+          this.updateFile(INDEX_PREFERANCE, indexRecord)
           break;
         default:
           this.log('No case found for kind ',kind);
       }
-      await Promise.all([
-        this.updateFile(INDEX, indexRecord),
-      ]);
+
   }
 
   private async handleProfileUpdate(data:any){
@@ -239,39 +253,68 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   private async handleGetProfile() { 
-    let lastSkapp = this.handleGetLastestProfileSkapp();
+    let lastSkapp =new String( await this.handleGetLastestProfileSkapp());
+    if(lastSkapp=='' ||lastSkapp == null ||lastSkapp == undefined){
+      return this.getBlankIndex();
+    }else{
     const LATEST_PROFILE_PATH =`${DATA_DOMAIN}/${lastSkapp}/user-profile.json`;
       return await this.downloadFile(LATEST_PROFILE_PATH);
+    }
   }
 
   private async handleGetPreferance() { 
-    let lastSkapp = this.handleGetLastestPrefSkapp();
+    let lastSkapp = await this.handleGetLastestPrefSkapp();
+    if(lastSkapp=='' ||lastSkapp == null ||lastSkapp == undefined){
+      return this.getBlankIndex();
+    }else{
     const LATEST_PREF_PATH =`${DATA_DOMAIN}/${lastSkapp}/user-profile.json`;
       return await this.downloadFile(LATEST_PREF_PATH);
+    }
   }
 
-  private async handleGetIndex() {
-    const { INDEX } = this.paths;
-      let indexData:any = await this.downloadFile(INDEX);
-      return indexData.profilehistory;
+  private async handleGetIndex(kind:string) {
+    const { INDEX_PROFILE,INDEX_PREFERANCE } = this.paths;
+    let indexData:any ={}
+    switch(kind){
+      case "PROFILE":
+        indexData=await this.downloadFile(INDEX_PROFILE);
+        break;
+      case "PREFERENCE":
+        indexData=await this.downloadFile(INDEX_PREFERANCE);
+        break;
+
+    } 
+      return indexData;
   }
 
   private async handleGetLastestProfileSkapp():Promise<string> {
-    const { INDEX } = this.paths;
-      let indexData:any = await this.downloadFile(INDEX);
+    const { INDEX_PROFILE } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX_PROFILE);
+      if(indexData!=null){
       return indexData.profile;
+      }else{
+        return ''
+      }
+
   }
   private async handleGetLastestPrefSkapp():Promise<string> {
-    const { INDEX } = this.paths;
-      let indexData:any = await this.downloadFile(INDEX);
-      return indexData.preferance;
+    const { INDEX_PREFERANCE } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX_PREFERANCE);
+      if(indexData!=null){
+        return indexData.preferance;
+        }else{
+          return ''
+        }
   }
 
   private async handleGetPreferanceHistory() {
-    const { INDEX } = this.paths;
-      let indexData:any = await this.downloadFile(INDEX);
+      let indexData:any = await this.handleGetIndex("PREFERENCE");
       return indexData.prefhistory;
   }
+  private async handleGetProfileHistory() {
+    let indexData:any = await this.handleGetIndex("PROFILE");
+    return indexData.profilehistory;
+}
 
   // downloadFile merely wraps getJSON but is typed in a way that avoids
   // repeating the awkward "as unknown as T" everywhere
