@@ -29,7 +29,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       getProfileHistory: this.getProfileHistory.bind(this),
       setPreferance: this.setPreferance.bind(this),
       getPreferance: this.getPreferance.bind(this),
-      getPrefHistory: this.getPrefHistory.bind(this),
+      getPreferanceHistory: this.getPreferanceHistory.bind(this),
     };
 
     // create connection
@@ -57,7 +57,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       return this.handleGetProfile()
       }
     } catch(error) {
-      this.log('Error occurred trying to record new content, err: ', error)
+      this.log('Error occurred trying to get profile data, err: ', error)
       return { error: error }
     } 
   }
@@ -97,7 +97,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
    * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
    * @returns Promise<any> the preferance data update history
    */
-  public async getPrefHistory(data:any): Promise<any> {
+  public async getPreferanceHistory(data:any): Promise<any> {
     try { 
       // purposefully not awaited
       return this.handleGetPreferanceHistory();

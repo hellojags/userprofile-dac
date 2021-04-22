@@ -19,6 +19,7 @@ export interface IUserProfile {
 export interface IUserPreferance{
   darkmode:boolean;
   portal:string;
+  //more to be added in upcoming versions 
 }
 
 
