@@ -3,7 +3,9 @@ export interface IUserProfileDAC {
   setProfile(content: IUserProfile): Promise<IDACResponse>;
   getProfile(userId:string, options:IProfileOption): Promise<any>;
   setPreferance(data: IUserPreferance): Promise<IDACResponse>;
-  getPreferance(data:any): Promise<IUserPreferance>
+  getPreferance(data:any): Promise<IUserPreferance>;
+  getProfileHistory(data:any): Promise<any>;
+  getPreferanceHistory(data:any): Promise<any>;
 }
 
 export interface IProfileOption{
