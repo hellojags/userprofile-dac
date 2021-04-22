@@ -257,7 +257,7 @@ private getBlankIndex(){
     if(lastSkapp=='' ||lastSkapp == null ||lastSkapp == undefined){
       return this.getBlankIndex();
     }else{
-    const LATEST_PREF_PATH =`${DATA_DOMAIN}/${lastSkapp}/user-profile.json`;
+    const LATEST_PREF_PATH =`${DATA_DOMAIN}/${lastSkapp}/global-preference.json`;
       return await this.downloadFile(LATEST_PREF_PATH);
     }
   }
