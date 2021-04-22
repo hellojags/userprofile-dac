@@ -53,10 +53,23 @@ export default class UserProfileDAC implements IUserProfileDAC {
     try { 
       return this.handleGetProfile()
     } catch(error) {
-      if(options!=null && options != undefined && options.ipd =="SkyId"){
-        return await this.client.db.getJSON(userId,"profile")
-       }else{
       this.log('Error occurred trying to get profile data, err: ', error)
+      
+      if(options!=null && options != undefined && options.ipd =="SkyId"){
+        this.log('Got SkyId params checking SkyID');
+        let oldData:any=await this.client.db.getJSON(userId,"profile")
+        let userProfile: IUserProfile ={
+          username: oldData.username,
+          aboutMe: oldData.aboutMe,
+          location: oldData.location || "",
+          topics: oldData.tags || [],
+          avatar: oldData.avatar || []
+        }
+        this.log('Updating DAC User Profile')
+        this.handleProfileUpdate(userProfile);
+        return { error: error }
+       }else{
+      
       return { error: error }
        }
     } 
