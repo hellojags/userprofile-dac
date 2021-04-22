@@ -51,14 +51,14 @@ export default class UserProfileDAC implements IUserProfileDAC {
    */
   public async getProfile(userId:string,options:IProfileOption): Promise<any> {
     try { 
-      if(options!=null && options != undefined && options.ipd =="SkyId"){
-       return await this.client.db.getJSON(userId,"profile")
-      }else{
       return this.handleGetProfile()
-      }
     } catch(error) {
+      if(options!=null && options != undefined && options.ipd =="SkyId"){
+        return await this.client.db.getJSON(userId,"profile")
+       }else{
       this.log('Error occurred trying to get profile data, err: ', error)
       return { error: error }
+       }
     } 
   }
   /**
