@@ -1,9 +1,7 @@
-import { Buffer } from "buffer"
 import { SkynetClient, MySky, JsonData } from "skynet-js";
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
-import { IUserProfile, EntryType, IDACResponse, IUserProfileDAC, IFilePaths } from "./types";
+import { IUserProfile, EntryType, IDACResponse,IUserPreferance, IUserProfileDAC, IFilePaths, IProfileOption } from "./types";
 
-// DAC consts
 const DATA_DOMAIN = "skyuser.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -12,7 +10,6 @@ const DEV_ENABLED = urlParams.get('dev') === "true";
 
 export default class UserProfileDAC implements IUserProfileDAC {
   protected connection: Promise<Connection>;
-
   private client: SkynetClient
   private mySky: MySky;
   private paths: IFilePaths;
@@ -27,11 +24,10 @@ export default class UserProfileDAC implements IUserProfileDAC {
     const methods = {
       init: this.init.bind(this),
       onUserLogin: this.onUserLogin.bind(this),
-      createNewProfile: this.createNewProfile.bind(this),
-      updateProfile: this.updateProfile.bind(this),
+      setProfile: this.setProfile.bind(this),
       getProfile: this.getProfile.bind(this),
       getProfileHistory: this.getProfileHistory.bind(this),
-      updatePreferance: this.updatePreferance.bind(this),
+      setPreferance: this.setPreferance.bind(this),
       getPreferance: this.getPreferance.bind(this),
       getPrefHistory: this.getPrefHistory.bind(this),
     };
@@ -49,12 +45,17 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
   /**
    * This method is used to retrive last saved users profile information globaly. accross all skapps using this dac
-   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @param userId need to pass a dummy data for remotemethod call sample {test:"test"}
+   * @param options need to pass {ipd:"SkyId"} for skyId profiles
    * @returns Promise<any> the last saved users profile data
    */
-  public async getProfile(data:any): Promise<any> {
+  public async getProfile(userId:string,options:IProfileOption): Promise<any> {
     try { 
+      if(options!=null && options != undefined && options.ipd =="SkyId"){
+       return await this.client.db.getJSON(userId,"profile")
+      }else{
       return this.handleGetProfile()
+      }
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
       return { error: error }
@@ -68,22 +69,6 @@ export default class UserProfileDAC implements IUserProfileDAC {
   public async getPreferance(data:any): Promise<any> {
     try { 
       return this.handleGetPreferance() 
-    } catch(error) {
-      this.log('Error occurred trying to record new content, err: ', error)
-      return { error: error }
-    } 
-  }
-
-  /**
-   * This method is used to save users preferance information globaly. accross all skapps using this dac
-   * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
-   * @returns Promise<any> success /error status
-   */
-  public async setPreferance(data:any): Promise<any> {
-    try { 
-      // purposefully not awaited
-      return this.handleGetProfile();
-      
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
       return { error: error }
@@ -123,16 +108,8 @@ export default class UserProfileDAC implements IUserProfileDAC {
     }
     
   }
-  public async createNewProfile(data: IUserProfile): Promise<IDACResponse> {
-    try { 
-      this.handleProfileUpdate(data);
-      this.handleNewEntries(EntryType.CREATEPROFILE, data) 
-    } catch(error) {
-      this.log('Error occurred trying to record new content, err: ', error)
-    }
-    return { submitted: true }
-  }
-  public async updateProfile(data: IUserProfile): Promise<IDACResponse> {
+
+  public async setProfile(data: IUserProfile): Promise<IDACResponse> {
     try { 
       this.handleProfileUpdate(data);
       this.handleNewEntries(EntryType.UPDATEPROFILE, data)
@@ -143,7 +120,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   
-  public async updatePreferance(data: IUserProfile): Promise<IDACResponse> {
+  public async setPreferance(data: IUserPreferance): Promise<IDACResponse> {
     try { 
       this.handlePrefUpdate(data);
       this.handleNewEntries(EntryType.UPDATEPREF, data)
@@ -202,7 +179,7 @@ private getBlankIndex(){
   }
 }
 
-  private async handleNewEntries(kind: EntryType, data: IUserProfile) {
+  private async handleNewEntries(kind: EntryType, data: IUserProfile|IUserPreferance) {
     const { INDEX_PROFILE,INDEX_PREFERANCE } = this.paths;
     let indexRecord:any = {} 
 

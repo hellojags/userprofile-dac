@@ -1,48 +1,32 @@
 export interface IUserProfileDAC {
-  createNewProfile(content: IUserProfile): Promise<IDACResponse>;
-  updateProfile(content: IUserProfile): Promise<IDACResponse>;
-  getProfile(data:any): Promise<any>;
+  
+  setProfile(content: IUserProfile): Promise<IDACResponse>;
+  getProfile(userId:string, options:IProfileOption): Promise<any>;
+  setPreferance(data: IUserPreferance): Promise<IDACResponse>;
+  getPreferance(data:any): Promise<IUserPreferance>
 }
 
+export interface IProfileOption{
+  ipd:string
+}
 export interface IUserProfile { 
   username: string,
-  aboutme?: string,
+  aboutMe?: string,
   location?: string,
-  preferance?:any,
-  tags?: any[],
+  topics?: string[],
   avatar?: any[]
 }
+export interface IUserPreferance{
+  darkmode:boolean;
+  portal:string;
+}
+
 
 export interface IUserProfilePersistence {
   timestamp: number;  // unix timestamp of recording
   version: number;
 }
 
-export interface ICreateProfilePersistence extends IUserProfilePersistence { }
-export interface IUpdateProfilePersistence extends IUserProfilePersistence { }
-
-export interface IIndex {
-  version: number;
-
-  currPageNumber: number;
-  currPageNumEntries: number;
-
-  pages: string[];
-  pageSize: number;
-}
-
-export interface IPage<IEntry> {
-  version: number;
-
-  indexPath: string; // back reference to the index
-  pagePath: string; // back reference to the path
-
-  entries: IEntry[];
-}
-
-export interface IDictionary {
-  [key:string]: boolean
-}
 export interface IDACResponse {
   submitted: boolean;
   error?: string;
