@@ -2,10 +2,10 @@ export interface IUserProfileDAC {
   
   setProfile(content: IUserProfile): Promise<IDACResponse>;
   getProfile(userId:string, options:IProfileOption): Promise<any>;
-  setPreferance(data: IUserPreferance): Promise<IDACResponse>;
-  getPreferance(data:any): Promise<IUserPreferance>;
+  setPreference(data: IUserPreference): Promise<IDACResponse>;
+  getPreference(data:any): Promise<IUserPreference>;
   getProfileHistory(data:any): Promise<any>;
-  getPreferanceHistory(data:any): Promise<any>;
+  getPreferenceHistory(data:any): Promise<any>;
 }
 
 export interface IProfileOption{
@@ -18,7 +18,7 @@ export interface IUserProfile {
   topics?: string[],
   avatar?: any[]
 }
-export interface IUserPreferance{
+export interface IUserPreference{
   darkmode:boolean;
   portal:string;
   //more to be added in upcoming versions 
@@ -51,5 +51,5 @@ export interface IFilePaths {
   PREF_PATH: string;
   PROFILE_PATH: string;
   INDEX_PROFILE: string;
-  INDEX_PREFERANCE: string;
+  INDEX_PREFERENCE: string;
 }

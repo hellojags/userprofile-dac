@@ -1,6 +1,6 @@
 import { SkynetClient, MySky, JsonData } from "skynet-js";
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
-import { IUserProfile, EntryType, IDACResponse,IUserPreferance, IUserProfileDAC, IFilePaths, IProfileOption } from "./types";
+import { IUserProfile, EntryType, IDACResponse,IUserPreference, IUserProfileDAC, IFilePaths, IProfileOption } from "./types";
 
 const DATA_DOMAIN = "skyuser.hns";
 
@@ -27,9 +27,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
       setProfile: this.setProfile.bind(this),
       getProfile: this.getProfile.bind(this),
       getProfileHistory: this.getProfileHistory.bind(this),
-      setPreferance: this.setPreferance.bind(this),
-      getPreferance: this.getPreferance.bind(this),
-      getPreferanceHistory: this.getPreferanceHistory.bind(this),
+      setPreference: this.setPreference.bind(this),
+      getPreference: this.getPreference.bind(this),
+      getPreferenceHistory: this.getPreferenceHistory.bind(this),
     };
 
     // create connection
@@ -75,13 +75,13 @@ export default class UserProfileDAC implements IUserProfileDAC {
     } 
   }
   /**
-   * This method is used to retrive last saved users preferance information globaly. accross all skapps using this dac
+   * This method is used to retrive last saved users Preference information globaly. accross all skapps using this dac
    * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
-   * @returns Promise<any> the last saved users preferance data
+   * @returns Promise<any> the last saved users Preference data
    */
-  public async getPreferance(data:any): Promise<any> {
+  public async getPreference(data:any): Promise<any> {
     try { 
-      return this.handleGetPreferance() 
+      return this.handleGetPreference() 
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
       return { error: error }
@@ -106,14 +106,14 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
       /**
-   * This method is used to retrive users preferance information update History. accross all skapps using this dac
+   * This method is used to retrive users Preference information update History. accross all skapps using this dac
    * @param data need to pass a dummy data for remotemethod call sample {test:"test"}
-   * @returns Promise<any> the preferance data update history
+   * @returns Promise<any> the Preference data update history
    */
-  public async getPreferanceHistory(data:any): Promise<any> {
+  public async getPreferenceHistory(data:any): Promise<any> {
     try { 
       // purposefully not awaited
-      return this.handleGetPreferanceHistory();
+      return this.handleGetPreferenceHistory();
       
     } catch(error) {
       this.log('Error occurred trying to record new content, err: ', error)
@@ -133,7 +133,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   
-  public async setPreferance(data: IUserPreferance): Promise<IDACResponse> {
+  public async setPreference(data: IUserPreference): Promise<IDACResponse> {
     try { 
       this.handlePrefUpdate(data);
       this.handleNewEntries(EntryType.UPDATEPREF, data)
@@ -159,7 +159,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
         PREF_PATH: `${DATA_DOMAIN}/${skapp}/global-preference.json`,
         PROFILE_PATH: `${DATA_DOMAIN}/${skapp}/user-profile.json`,
         INDEX_PROFILE: `${DATA_DOMAIN}/index_profile.json`,
-        INDEX_PREFERANCE: `${DATA_DOMAIN}/index_preferance.json`
+        INDEX_PREFERENCE: `${DATA_DOMAIN}/index_preference.json`
       }
 
       // load mysky
@@ -185,15 +185,15 @@ export default class UserProfileDAC implements IUserProfileDAC {
 private getBlankIndex(){
   return      {
     profile:'',
-    preferance:'',
+    preference:'',
     profilehistory:[],
     prefhistory:[]
   
   }
 }
 
-  private async handleNewEntries(kind: EntryType, data: IUserProfile|IUserPreferance) {
-    const { INDEX_PROFILE,INDEX_PREFERANCE } = this.paths;
+  private async handleNewEntries(kind: EntryType, data: IUserProfile|IUserPreference) {
+    const { INDEX_PROFILE,INDEX_PREFERENCE } = this.paths;
     let indexRecord:any = {} 
 
     let updateLog = {
@@ -219,12 +219,12 @@ private getBlankIndex(){
     if(indexRecord==null || indexRecord == undefined ){
       indexRecord =this. getBlankIndex();    
     }
-          indexRecord.preferance=this.skapp;
+          indexRecord.preference=this.skapp;
           if(indexRecord.prefhistory==null){
             indexRecord.prefhistory=[]
           }
           indexRecord.prefhistory.push(updateLog);
-          this.updateFile(INDEX_PREFERANCE, indexRecord)
+          this.updateFile(INDEX_PREFERENCE, indexRecord)
           break;
         default:
           this.log('No case found for kind ',kind);
@@ -252,7 +252,7 @@ private getBlankIndex(){
     }
   }
 
-  private async handleGetPreferance() { 
+  private async handleGetPreference() { 
     let lastSkapp = await this.handleGetLastestPrefSkapp();
     if(lastSkapp=='' ||lastSkapp == null ||lastSkapp == undefined){
       return this.getBlankIndex();
@@ -263,14 +263,14 @@ private getBlankIndex(){
   }
 
   private async handleGetIndex(kind:string) {
-    const { INDEX_PROFILE,INDEX_PREFERANCE } = this.paths;
+    const { INDEX_PROFILE,INDEX_PREFERENCE } = this.paths;
     let indexData:any ={}
     switch(kind){
       case "PROFILE":
         indexData=await this.downloadFile(INDEX_PROFILE);
         break;
       case "PREFERENCE":
-        indexData=await this.downloadFile(INDEX_PREFERANCE);
+        indexData=await this.downloadFile(INDEX_PREFERENCE);
         break;
 
     } 
@@ -288,16 +288,16 @@ private getBlankIndex(){
 
   }
   private async handleGetLastestPrefSkapp():Promise<string> {
-    const { INDEX_PREFERANCE } = this.paths;
-      let indexData:any = await this.downloadFile(INDEX_PREFERANCE);
+    const { INDEX_PREFERENCE } = this.paths;
+      let indexData:any = await this.downloadFile(INDEX_PREFERENCE);
       if(indexData!=null){
-        return indexData.preferance;
+        return indexData.preference;
         }else{
           return ''
         }
   }
 
-  private async handleGetPreferanceHistory() {
+  private async handleGetPreferenceHistory() {
       let indexData:any = await this.handleGetIndex("PREFERENCE");
       return indexData.prefhistory;
   }
