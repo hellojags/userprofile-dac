@@ -1,7 +1,7 @@
 {
   "name": "userprofile-record-dac",
-  "version": "0.1.0",
-  "description": "",
+  "version": "0.1.0-Beta",
+  "description": "Skynet - user profile & global preferences DAC",
   "main": "src/index.ts",
   "scripts": {
     "build": "npx webpack",
@@ -16,7 +16,7 @@
   "dependencies": {
     "buffer": "^6.0.3",
     "post-me": "^0.4.5",
-    "skynet-js": "^4.0.1-beta"
+    "skynet-js": "^4.0.2-beta"
   },
   "devDependencies": {
     "@types/jest": "^26.0.22",

@@ -1,45 +1,57 @@
 export interface IUserProfileDAC {
-  
   setProfile(content: IUserProfile): Promise<IDACResponse>;
-  getProfile(userId:string, options:IProfileOption): Promise<any>;
-  setPreference(data: IUserPreference): Promise<IDACResponse>;
-  getPreference(data:any): Promise<IUserPreference>;
-  getProfileHistory(data:any): Promise<any>;
-  getPreferenceHistory(data:any): Promise<any>;
+  setPreferences(data: IUserPreferences): Promise<IDACResponse>;
+  // getProfile(userId:string, options:IProfileOptions): Promise<any>;
+  // getPreferences(data:any,options:IPreferencesOptions): Promise<IUserPreferences>;
+  // getProfileHistory(data:any): Promise<any>;
+  // getPreferencesHistory(data:any): Promise<any>;
 }
-
-export interface IProfileOption{
-  ipd:string
+export interface IUserProfile {
+  version: number;
+  username: string;
+  aboutMe?: string;
+  location?: string;
+  topics?: string[];
+  avatar?: any[];
 }
-export interface IUserProfile { 
-  username: string,
-  aboutMe?: string,
-  location?: string,
-  topics?: string[],
-  avatar?: any[]
+export interface IHistoryLog
+{
+  updatedBy: string,
+  timestamp: Date
 }
-export interface IUserPreference{
+export interface IProfileIndex {
+  version: number;
+  profile : IUserProfile;
+  lastUpdatedBy: string;
+  historyLog : IHistoryLog[];
+}
+export interface IPreferencesIndex {
+  version: number;
+  preferences : IUserPreferences;
+  lastUpdatedBy: string;
+  historyLog : IHistoryLog[];
+}
+export interface IProfileOptions{
+  ipd?:string,
+  skapp?:string
+}
+export interface IPreferencesOptions{
+  skapp?:string
+}
+export interface IUserPreferences{
+  version: number;
   darkmode:boolean;
   portal:string;
   //more to be added in upcoming versions 
 }
-
-
-export interface IUserProfilePersistence {
-  timestamp: number;  // unix timestamp of recording
-  version: number;
-}
-
 export interface IDACResponse {
   submitted: boolean;
   error?: string;
 }
 
-
 export enum EntryType {
-  'CREATEPROFILE',
-  'UPDATEPROFILE',
-  'UPDATEPREF'
+  'PROFILE',
+  'PREFERENCES',
 }
 
 // NOTE: the values contained by this interface are 'static', meaning they won't
@@ -48,8 +60,8 @@ export enum EntryType {
 //
 // e.g. const { NC_INDEX_PATH } = this.paths;
 export interface IFilePaths {
-  PREF_PATH: string;
+  PREFERENCES_PATH: string;
   PROFILE_PATH: string;
-  INDEX_PROFILE: string;
-  INDEX_PREFERENCE: string;
+  PROFILE_INDEX_PATH: string;
+  PREFERENCES_INDEX_PATH: string;
 }
