@@ -346,7 +346,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   // log prints to stdout only if DEBUG_ENABLED flag is set
   private log(message: string, ...optionalContext: any[]) {
     if (DEBUG_ENABLED) {
-      console.log(message, ...optionalContext)
+      console.log("UserProfileDAC :: "+message, ...optionalContext)
     }
   }
 }
