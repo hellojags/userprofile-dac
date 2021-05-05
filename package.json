@@ -16,10 +16,10 @@
   "dependencies": {
     "buffer": "^6.0.3",
     "post-me": "^0.4.5",
-    "skynet-js": "^4.0.2-beta"
+    "skynet-js": "^4.0.5-beta"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.22",
+    "@types/jest": "^26.0.23",
     "@types/node": "^14.14.37",
     "@typescript-eslint/eslint-plugin": "^4.21.0",
     "@typescript-eslint/parser": "^4.21.0",

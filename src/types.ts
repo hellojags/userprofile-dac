@@ -1,15 +1,51 @@
+import { VERSION } from "./dac";
+
 export interface IUserProfileDAC {
   setProfile(profile: IUserProfile): Promise<IDACResponse>;
   updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse>;
   setPreferences(prefs: IUserPreferences): Promise<IDACResponse>;
 }
+
+// DEFAULT_USER_PROFILE defines all props as it is used in validator
+export const DEFAULT_USER_PROFILE: IUserProfile = {
+  version: VERSION,
+  username: "anonymous",
+  firstName: "",
+  lastName: "",
+  emailID: "",
+  contact: "",
+  aboutMe: "",
+  location: "",
+  topics: [],
+  avatar: [],
+  connections: []
+}
+
+export const DEFAULT_PREFERENCES: IUserPreferences = {
+  version: VERSION,
+  darkmode: false,
+  portal: "https://siasky.net"
+}
+
 export interface IUserProfile {
   version: number;
   username: string;
+  firstName?: string;
+  lastName?: string;
+  emailID?: string;
+  contact?: string;
   aboutMe?: string;
   location?: string;
   topics?: string[];
-  avatar?: any[];
+  avatar?: IAvatar[];
+  connections?: any[];
+}
+
+export interface IAvatar {
+  ext: string,
+  w: number,
+  h: number,
+  url: string
 }
 export interface IHistoryLog
 {

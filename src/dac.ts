@@ -1,11 +1,11 @@
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
 import { JsonData, MySky, SkynetClient } from "skynet-js";
-import { IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC } from "./types";
+import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC } from "./types";
 import { validateProfile } from "./utils";
 
 export const VERSION = 1;
 
-const DATA_DOMAIN = "skyuser.hns";
+const DATA_DOMAIN = "profile-dac.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
@@ -18,7 +18,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
   private mySky: MySky;
   private paths: IFilePaths;
   private skapp: string;
-  private initialized: boolean;
+
+  // will be flipped to true if all files are created
+  private fileHierarchyEnsured: boolean;
 
   public constructor() {
     // create client
@@ -83,12 +85,12 @@ export default class UserProfileDAC implements IUserProfileDAC {
       .then(() => { this.log('Successfully ensured Preferences index') })
       .catch(err => { this.log('Failed to ensure Preferences index, err: ', err) }))
       
-    Promise.all(promises).then(() => { this.initialized = true})
+    Promise.all(promises).then(() => { this.fileHierarchyEnsured = true})
   }
 
   // Only set Methods needs to be in DAC
   public async setProfile(profile: IUserProfile): Promise<IDACResponse> {
-    if (!await this.waitUntilInitialized()) {
+    if (!await this.waitUntilFilesArePresent()) {
       return this.fail('Could not set profile, initialization timeout');
     }
 
@@ -105,7 +107,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   public async updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse> {
-    if (!await this.waitUntilInitialized()) {
+    if (!await this.waitUntilFilesArePresent()) {
       return this.fail('Could not set profile, initialization timeout');
     }
 
@@ -115,6 +117,10 @@ export default class UserProfileDAC implements IUserProfileDAC {
       const { PROFILE_PATH: path } = this.paths;
       const current = await this.downloadFile<IUserProfile>(path)
       update = current ? { ...current, ...profile } : profile as IUserProfile;
+      // make sure we have not overwritten the original avatars
+      if (current && current.avatar && update.avatar) {
+        update.avatar = [...current.avatar, ...update.avatar]
+      }
     } catch (error) {
       return this.fail(`updateProfile failed, err: ${error.message}`)
     }
@@ -123,7 +129,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   public async setPreferences(prefs: IUserPreferences): Promise<IDACResponse> {
-    const initiliazed = await this.waitUntilInitialized()
+    const initiliazed = await this.waitUntilFilesArePresent()
     if (!initiliazed) {
       return this.fail('Could not set preferences, initialization timeout');
     }
@@ -145,7 +151,12 @@ export default class UserProfileDAC implements IUserProfileDAC {
     const { PROFILE_INDEX_PATH: path } = this.paths;
     const index = await this.downloadFile<IProfileIndex>(path);
     if (!index) {
-      await this.updateFile(path, this.getInitialProfileIndex())
+      await this.updateFile(path, {
+        version: VERSION,
+        profile: DEFAULT_USER_PROFILE,
+        lastUpdatedBy: this.skapp,
+        historyLog: []
+      }) // default index
     }
   }
 
@@ -154,7 +165,12 @@ export default class UserProfileDAC implements IUserProfileDAC {
     const { PREFERENCES_INDEX_PATH: path } = this.paths;
     const index = await this.downloadFile<IPreferencesIndex>(path);
     if (!index) {
-      await this.updateFile(path, this.getInitialPrefrencesIndex())
+      await this.updateFile(path, {
+        version: VERSION,
+        preferences: DEFAULT_PREFERENCES,
+        lastUpdatedBy: this.skapp,
+        historyLog: []
+      }) // default preferences
     }
   }
 
@@ -163,6 +179,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     const index = await this.downloadFile<IProfileIndex>(path);
     if (!index) {
       throw new Error('Profile index not found');
+    }
+    if (!index.historyLog) {
+      index.historyLog = []
     }
 
     index.profile = profile;
@@ -181,6 +200,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     if (!index) {
       throw new Error('Preferences index not found');
     }
+    if (!index.historyLog) {
+      index.historyLog = []
+    }
 
     index.preferences = prefs;
     index.lastUpdatedBy = this.skapp;
@@ -192,9 +214,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     await this.updateFile(path, index)
   }
 
-  private waitUntilInitialized(): Promise<boolean> {
+  private waitUntilFilesArePresent(): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (this.initialized) {
+      if (this.fileHierarchyEnsured) {
         resolve(true);
         return;
       }
@@ -202,12 +224,12 @@ export default class UserProfileDAC implements IUserProfileDAC {
       const start = new Date().getTime()
       while (true) {
         setTimeout(() => {
-          if (this.initialized) {
+          if (this.fileHierarchyEnsured) {
             resolve(true);
           }
           const elapsed = new Date().getTime() - start;
           if (elapsed > 60000) {
-            this.log(`waitUntilInitialized timed out after ${elapsed}ms`)
+            this.log(`waitUntilFilesArePresent timed out after ${elapsed}ms`)
             reject(false)
           }
         }, 100)
@@ -233,42 +255,6 @@ export default class UserProfileDAC implements IUserProfileDAC {
   private async updateFile<T>(path: string, data: T) {
     this.log('updating file at path', path, data)
     await this.mySky.setJSON(path, data as unknown as JsonData)
-  }
-
-  private getInitialProfile() {
-    return {
-      version: VERSION,
-      username: "",
-      aboutMe: "",
-      location: "",
-      topics: [],
-      avatar: []
-    }
-  }
-  private getInitialPrefrences() {
-    return {
-      version: VERSION,
-      darkmode: false,
-      portal: "https://siasky.net"
-    }
-  }
-  private getInitialProfileIndex() {
-    let initialProfile = this.getInitialProfile();
-    return {
-      version: VERSION,
-      profile: initialProfile,
-      lastUpdatedBy: this.skapp,
-      historyLog: []
-    }
-  }
-  private getInitialPrefrencesIndex() {
-    let initialPrefrences = this.getInitialPrefrences();
-    return {
-      version: VERSION,
-      preferences: initialPrefrences,
-      lastUpdatedBy: this.skapp,
-      historyLog: []
-    }
   }
 
   // fail is a helper function that logs the error and returns a dac response
