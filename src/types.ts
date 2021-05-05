@@ -1,10 +1,7 @@
 export interface IUserProfileDAC {
-  setProfile(content: IUserProfile): Promise<IDACResponse>;
-  setPreferences(data: IUserPreferences): Promise<IDACResponse>;
-  // getProfile(userId:string, options:IProfileOptions): Promise<any>;
-  // getPreferences(data:any,options:IPreferencesOptions): Promise<IUserPreferences>;
-  // getProfileHistory(data:any): Promise<any>;
-  // getPreferencesHistory(data:any): Promise<any>;
+  setProfile(profile: IUserProfile): Promise<IDACResponse>;
+  updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse>;
+  setPreferences(prefs: IUserPreferences): Promise<IDACResponse>;
 }
 export interface IUserProfile {
   version: number;
