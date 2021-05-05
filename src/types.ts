@@ -9,10 +9,21 @@ export interface IUserProfileDAC {
 export interface IUserProfile {
   version: number;
   username: string;
+  firstName?: string;
+  lastName?: string;
+  emailID?: string;
+  contact?: string;
   aboutMe?: string;
   location?: string;
   topics?: string[];
-  avatar?: any[];
+  avatar?: IAvatar[];
+  connections?: any[];
+}
+export interface IAvatar {
+  ext: string,
+  w: number,
+  h: number,
+  url: string
 }
 export interface IHistoryLog
 {

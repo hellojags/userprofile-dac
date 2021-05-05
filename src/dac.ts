@@ -2,7 +2,7 @@ import { SkynetClient, MySky, JsonData } from "skynet-js";
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
 import { IUserProfile, EntryType, IDACResponse, IUserPreferences, IUserProfileDAC, IFilePaths, IProfileOptions, IPreferencesOptions, IHistoryLog, IProfileIndex, IPreferencesIndex } from "./types";
 
-const DATA_DOMAIN = "skyuser.hns";
+const DATA_DOMAIN = "profile-dac.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
@@ -216,7 +216,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   public async setProfile(data: IUserProfile): Promise<IDACResponse> {
     try {
       await this.updateFile(this.paths.PROFILE_PATH, data)
-      this.setProfileIndex(EntryType.PROFILE, data)
+      await this.setProfileIndex(EntryType.PROFILE, data)
     } catch (error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }
@@ -225,7 +225,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   public async setPreferences(data: IUserPreferences): Promise<IDACResponse> {
     try {
       await this.updateFile(this.paths.PREFERENCES_PATH, data)
-      this.setPreferencesIndex(EntryType.PREFERENCES, data)
+      await this.setPreferencesIndex(EntryType.PREFERENCES, data)
     } catch (error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }
