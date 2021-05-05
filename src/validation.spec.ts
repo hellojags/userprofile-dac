@@ -1,5 +1,5 @@
 import { DEFAULT_USER_PROFILE, IAvatar } from './types'
-import { validateAvatar, validateProfile } from './utils'
+import { validateAvatar, validateProfile } from './validation'
 
 // TODO: could/should be extended
 
