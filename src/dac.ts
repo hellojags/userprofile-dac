@@ -236,8 +236,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       }
     })
   }
-
-  // downloadFile merely wraps getJSON but is typed in a way that avoids
+// downloadFile merely wraps getJSON but is typed in a way that avoids
   // repeating the awkward "as unknown as T" everywhere
   private async downloadFile<T>(path: string): Promise<T | null> {
     this.log('downloading file at path', path)
