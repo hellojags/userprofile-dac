@@ -1,20 +1,26 @@
-import { SkynetClient, MySky, JsonData } from "skynet-js";
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
-import { IUserProfile, EntryType, IDACResponse, IUserPreferences, IUserProfileDAC, IFilePaths, IProfileOptions, IPreferencesOptions, IHistoryLog, IProfileIndex, IPreferencesIndex } from "./types";
+import { JsonData, MySky, SkynetClient } from "skynet-js";
+import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC } from "./types";
+import { validateProfile } from "./validation";
+
+export const VERSION = 1;
 
 const DATA_DOMAIN = "profile-dac.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
 const DEV_ENABLED = urlParams.get('dev') === "true";
-const VERSION = 1;
 
 export default class UserProfileDAC implements IUserProfileDAC {
   protected connection: Promise<Connection>;
+
   private client: SkynetClient
   private mySky: MySky;
   private paths: IFilePaths;
   private skapp: string;
+
+  // will be flipped to true if all files are created
+  private fileHierarchyEnsured: boolean;
 
   public constructor() {
     // create client
@@ -25,6 +31,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       init: this.init.bind(this),
       onUserLogin: this.onUserLogin.bind(this),
       setProfile: this.setProfile.bind(this),
+      updateProfile: this.updateProfile.bind(this),
       setPreferences: this.setPreferences.bind(this),
     };
 
@@ -50,10 +57,10 @@ export default class UserProfileDAC implements IUserProfileDAC {
       this.skapp = skapp;
 
       this.paths = {
+        PREFERENCES_INDEX_PATH: `${DATA_DOMAIN}/preferencesIndex.json`,
         PREFERENCES_PATH: `${DATA_DOMAIN}/${skapp}/preferences.json`,
-        PROFILE_PATH: `${DATA_DOMAIN}/${skapp}/userprofile.json`,
         PROFILE_INDEX_PATH: `${DATA_DOMAIN}/profileIndex.json`,
-        PREFERENCES_INDEX_PATH: `${DATA_DOMAIN}/preferencesIndex.json`
+        PROFILE_PATH: `${DATA_DOMAIN}/${skapp}/userprofile.json`,
       }
 
       // load mysky
@@ -67,96 +74,169 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
   // onUserLogin is called by MySky when the user has logged in successfully
   public async onUserLogin() {
-    // Ensure file hierarchy will ensure the index and current page file for
-    // both entry types get precreated. This should alleviate a very slow
-    // `getJSON` timeout on inserting the first entry.
-    this.ensureProfilePresent()
-      .then(() => { this.log('Successfully ensured Profile Present') })
-      .catch(err => { this.log('Failed to ensure Profile Present, err: ', err) })
-    this.ensurePreferencesPresent()
-      .then(() => { this.log('Successfully ensured Preferences Present') })
-      .catch(err => { this.log('Failed to ensure Preferences Present, err: ', err) })
+    const promises = []
+
+    promises.push(this.ensureProfilePresent()
+      .then(() => { this.log('Successfully ensured Profile index') })
+      .catch(err => { this.log('Failed to ensure Profile index, err: ', err) })
+    )
+
+    promises.push(this.ensurePreferencesPresent()
+      .then(() => { this.log('Successfully ensured Preferences index') })
+      .catch(err => { this.log('Failed to ensure Preferences index, err: ', err) }))
+      
+    Promise.all(promises).then(() => { this.fileHierarchyEnsured = true})
   }
 
-  // ensureFileHierarchy ensures that for every entry type its current index and
-  // page file exist, this ensures we do not take the hit for it when the user
-  // interacts with the DAC, seeing as non existing file requests time out only
-  // after a certain amount of time.
-  private async ensureProfilePresent(): Promise<void> {
-    const { PROFILE_INDEX_PATH } = this.paths;
-    let profileIndex = await this.downloadFile(PROFILE_INDEX_PATH);
-    // Check if Index files are Initalized, if not create empty files
-    if (profileIndex == '' || profileIndex == null || profileIndex == undefined) {
-      this.updateFile(PROFILE_INDEX_PATH, this.getInitialProfileIndex())
-    }
-  }
-  private async ensurePreferencesPresent(): Promise<void> {
-    const { PREFERENCES_INDEX_PATH } = this.paths;
-    let preferenceIndex = await this.downloadFile(PREFERENCES_INDEX_PATH);
-    // Check if Index files are Initalized, if not create empty files
-    if (preferenceIndex == '' || preferenceIndex == null || preferenceIndex == undefined) {
-      this.updateFile(PREFERENCES_INDEX_PATH, this.getInitialPrefrencesIndex())
-    }
-  }
   // Only set Methods needs to be in DAC
-  public async setProfile(data: IUserProfile): Promise<IDACResponse> {
+  public async setProfile(profile: IUserProfile): Promise<IDACResponse> {
+    if (!await this.waitUntilFilesArePresent()) {
+      return this.fail('Could not set profile, initialization timeout');
+    }
+
     try {
-      await this.updateFile(this.paths.PROFILE_PATH, data)
-      await this.setProfileIndex(EntryType.PROFILE, data)
+      validateProfile(profile)
+      const { PROFILE_PATH: path } = this.paths;
+      await this.updateFile(path, profile)
+      await this.updateProfileIndex(profile) // TODO added await, ok?
+    } catch (error) {
+      return this.fail(`setProfile failed, err: ${error.message}`)
+    }
+
+    return { submitted: true }
+  }
+
+  public async updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse> {
+    if (!await this.waitUntilFilesArePresent()) {
+      return this.fail('Could not set profile, initialization timeout');
+    }
+
+    let update: IUserProfile;
+
+    try {
+      const { PROFILE_PATH: path } = this.paths;
+      const current = await this.downloadFile<IUserProfile>(path)
+      update = current ? { ...current, ...profile } : profile as IUserProfile;
+      // make sure we have not overwritten the original avatars
+      if (current && current.avatar && update.avatar) {
+        update.avatar = [...current.avatar, ...update.avatar]
+      }
+    } catch (error) {
+      return this.fail(`updateProfile failed, err: ${error.message}`)
+    }
+
+    return await this.setProfile(update)
+  }
+
+  public async setPreferences(prefs: IUserPreferences): Promise<IDACResponse> {
+    const initiliazed = await this.waitUntilFilesArePresent()
+    if (!initiliazed) {
+      return this.fail('Could not set preferences, initialization timeout');
+    }
+
+    // TODO validate preferences
+
+    try {
+      const { PREFERENCES_PATH: path } = this.paths;
+      await this.updateFile(path, prefs)
+      this.updatePreferencesIndex(prefs)
     } catch (error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }
     return { submitted: true }
   }
-  public async setPreferences(data: IUserPreferences): Promise<IDACResponse> {
-    try {
-      await this.updateFile(this.paths.PREFERENCES_PATH, data)
-      await this.setPreferencesIndex(EntryType.PREFERENCES, data)
-    } catch (error) {
-      this.log('Error occurred trying to record new content, err: ', error)
+
+  // ensureProfilePresent ensures the profile index file exists.
+  private async ensureProfilePresent(): Promise<void> {
+    const { PROFILE_INDEX_PATH: path } = this.paths;
+    const index = await this.downloadFile<IProfileIndex>(path);
+    if (!index) {
+      await this.updateFile(path, {
+        version: VERSION,
+        profile: DEFAULT_USER_PROFILE,
+        lastUpdatedBy: this.skapp,
+        historyLog: []
+      }) // default index
     }
-    return { submitted: true }
   }
 
-  private async setProfileIndex(kind: EntryType, data: IUserProfile) {
-    let indexRecord : IProfileIndex|null = null;
-    let updateLog : IHistoryLog = {
+  // ensurePreferencesPresent ensures the preferences index file exists.
+  private async ensurePreferencesPresent(): Promise<void> {
+    const { PREFERENCES_INDEX_PATH: path } = this.paths;
+    const index = await this.downloadFile<IPreferencesIndex>(path);
+    if (!index) {
+      await this.updateFile(path, {
+        version: VERSION,
+        preferences: DEFAULT_PREFERENCES,
+        lastUpdatedBy: this.skapp,
+        historyLog: []
+      }) // default preferences
+    }
+  }
+
+  private async updateProfileIndex(profile: IUserProfile) {
+    const { PROFILE_INDEX_PATH: path } = this.paths;    
+    const index = await this.downloadFile<IProfileIndex>(path);
+    if (!index) {
+      throw new Error('Profile index not found');
+    }
+    if (!index.historyLog) {
+      index.historyLog = []
+    }
+
+    index.profile = profile;
+    index.lastUpdatedBy = this.skapp;
+    index.historyLog.push({
       updatedBy: this.skapp,
       timestamp: new Date()
-    }
-    indexRecord = await this.downloadFile(this.paths.PROFILE_INDEX_PATH);
-    if (indexRecord == null || indexRecord == undefined) {
-      indexRecord = this.getInitialProfileIndex();
-    }
-    indexRecord.lastUpdatedBy = this.skapp;
-    indexRecord.profile = data;
-    if (indexRecord.historyLog == null) {
-      indexRecord.historyLog = []
-    }
-    indexRecord.historyLog.push(updateLog);
-    this.updateFile(this.paths.PROFILE_INDEX_PATH, indexRecord)
+    });
+
+    await this.updateFile(path, index)
   }
 
-  private async setPreferencesIndex(kind: EntryType, data: IUserPreferences) {
-    let indexRecord : IPreferencesIndex|null = null;
-    let updateLog : IHistoryLog = {
+  private async updatePreferencesIndex(prefs: IUserPreferences) {
+    const { PREFERENCES_INDEX_PATH: path } = this.paths;
+    const index = await this.downloadFile<IPreferencesIndex>(path);
+    if (!index) {
+      throw new Error('Preferences index not found');
+    }
+    if (!index.historyLog) {
+      index.historyLog = []
+    }
+
+    index.preferences = prefs;
+    index.lastUpdatedBy = this.skapp;
+    index.historyLog.push({
       updatedBy: this.skapp,
       timestamp: new Date()
-    }
-    indexRecord = await this.downloadFile(this.paths.PREFERENCES_INDEX_PATH);
-    if (indexRecord == null || indexRecord == undefined) {
-      indexRecord = this.getInitialPrefrencesIndex();
-    }
-    indexRecord.lastUpdatedBy = this.skapp;
-    indexRecord.preferences = data;
-    if (indexRecord.historyLog == null) {
-      indexRecord.historyLog = []
-    }
-    indexRecord.historyLog.push(updateLog);
-    this.updateFile(this.paths.PREFERENCES_INDEX_PATH, indexRecord)
+    });
+
+    await this.updateFile(path, index)
   }
 
-  // downloadFile merely wraps getJSON but is typed in a way that avoids
+  private waitUntilFilesArePresent(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (this.fileHierarchyEnsured) {
+        resolve(true);
+        return;
+      }
+
+      const start = new Date().getTime()
+      while (true) {
+        setTimeout(() => {
+          if (this.fileHierarchyEnsured) {
+            resolve(true);
+          }
+          const elapsed = new Date().getTime() - start;
+          if (elapsed > 60000) {
+            this.log(`waitUntilFilesArePresent timed out after ${elapsed}ms`)
+            reject(false)
+          }
+        }, 100)
+      }
+    })
+  }
+// downloadFile merely wraps getJSON but is typed in a way that avoids
   // repeating the awkward "as unknown as T" everywhere
   private async downloadFile<T>(path: string): Promise<T | null> {
     this.log('downloading file at path', path)
@@ -176,41 +256,13 @@ export default class UserProfileDAC implements IUserProfileDAC {
     await this.mySky.setJSON(path, data as unknown as JsonData)
   }
 
-  private getInitialProfile() {
-    return {
-      version: VERSION,
-      username: "",
-      aboutMe: "",
-      location: "",
-      topics: [],
-      avatar: []
-    }
+  // fail is a helper function that logs the error and returns a dac response
+  // that indicates failure
+  private fail(error: string): IDACResponse {
+    this.log(error)
+    return { submitted: false, error}
   }
-  private getInitialPrefrences() {
-    return {
-      version: VERSION,
-      darkmode: false,
-      portal: "https://siasky.net"
-    }
-  }
-  private getInitialProfileIndex() {
-    let initialProfile = this.getInitialProfile();
-    return {
-      version: VERSION,
-      profile: initialProfile,
-      lastUpdatedBy: this.skapp,
-      historyLog: []
-    }
-  }
-  private getInitialPrefrencesIndex() {
-    let initialPrefrences = this.getInitialPrefrences();
-    return {
-      version: VERSION,
-      preferences: initialPrefrences,
-      lastUpdatedBy: this.skapp,
-      historyLog: []
-    }
-  }
+
   // log prints to stdout only if DEBUG_ENABLED flag is set
   private log(message: string, ...optionalContext: any[]) {
     if (DEBUG_ENABLED) {
