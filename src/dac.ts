@@ -1,9 +1,7 @@
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
 import { JsonData, MySky, SkynetClient } from "skynet-js";
-import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC } from "./types";
+import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC,VERSION } from "./types";
 import { validateProfile } from "./validation";
-
-export const VERSION = 1;
 
 const DATA_DOMAIN = "profile-dac.hns";
 
@@ -139,7 +137,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
     try {
       const { PREFERENCES_PATH: path } = this.paths;
       await this.updateFile(path, prefs)
-      this.updatePreferencesIndex(prefs)
+      await this.updatePreferencesIndex(prefs)
     } catch (error) {
       this.log('Error occurred trying to record new content, err: ', error)
     }

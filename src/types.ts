@@ -1,5 +1,4 @@
-import { VERSION } from "./dac";
-
+export const VERSION = 1;
 export interface IUserProfileDAC {
   setProfile(profile: IUserProfile): Promise<IDACResponse>;
   updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse>;

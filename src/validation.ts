@@ -1,4 +1,4 @@
-import { VERSION } from "./dac";
+import { VERSION } from "./types";
 import { DEFAULT_USER_PROFILE, IAvatar, IUserProfile } from "./types";
 
 export function validateProfile(profile: IUserProfile) {
