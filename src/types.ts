@@ -16,7 +16,7 @@ export const DEFAULT_USER_PROFILE: IUserProfile = {
   aboutMe: "",
   location: "",
   topics: [],
-  avatar: [],
+  avatar: [{"ext":"","w":0,"h":0,"url":""}],
   connections: []
 }
 
