@@ -4,6 +4,7 @@ import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IP
 import { validateProfile } from "./validation";
 
 const DATA_DOMAIN = "profile-dac.hns";
+//const DATA_DOMAIN = "skypage.hns";
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_ENABLED = urlParams.get('debug') === "true";
