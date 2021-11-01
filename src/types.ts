@@ -1,8 +1,14 @@
 export const VERSION = 1;
 export interface IUserProfileDAC {
+  setUserStatus(status: string): Promise<IDACResponse>;
   setProfile(profile: IUserProfile): Promise<IDACResponse>;
   updateProfile(profile: Partial<IUserProfile>): Promise<IDACResponse>;
   setPreferences(prefs: IUserPreferences): Promise<IDACResponse>;
+}
+
+export enum StatusType {
+  'Online',
+  'Offline',
 }
 
 // DEFAULT_USER_PROFILE defines all props as it is used in validator
@@ -96,4 +102,6 @@ export interface IFilePaths {
   PROFILE_PATH: string;
   PROFILE_INDEX_PATH: string;
   PREFERENCES_INDEX_PATH: string;
+  USER_STATUS_INDEX_PATH: string;
+  USER_STATUS_PATH: string;
 }

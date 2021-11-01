@@ -19,6 +19,7 @@ module.exports = {
     ],
   },
   resolve: {
+    fallback: { "crypto": false },
     extensions: [".tsx", ".ts", ".js"],
     symlinks: false,
   },

@@ -1,7 +1,8 @@
 import { ChildHandshake, Connection, WindowMessenger } from "post-me";
 import { JsonData, MySky, SkynetClient } from "skynet-js";
-import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC,VERSION } from "./types";
+import { DEFAULT_PREFERENCES, DEFAULT_USER_PROFILE, IDACResponse, IFilePaths, IPreferencesIndex, IProfileIndex, IUserPreferences, IUserProfile, IUserProfileDAC, VERSION } from "./types";
 import { validateProfile } from "./validation";
+import { fromByteArray, toByteArray } from "base64-js";
 
 const DATA_DOMAIN = "profile-dac.hns";
 //const DATA_DOMAIN = "skypage.hns";
@@ -29,6 +30,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
     const methods = {
       init: this.init.bind(this),
       onUserLogin: this.onUserLogin.bind(this),
+      setUserStatus: this.setUserStatus.bind(this),
       setProfile: this.setProfile.bind(this),
       updateProfile: this.updateProfile.bind(this),
       setPreferences: this.setPreferences.bind(this),
@@ -60,13 +62,15 @@ export default class UserProfileDAC implements IUserProfileDAC {
         PREFERENCES_PATH: `${DATA_DOMAIN}/${skapp}/preferences.json`,
         PROFILE_INDEX_PATH: `${DATA_DOMAIN}/profileIndex.json`,
         PROFILE_PATH: `${DATA_DOMAIN}/${skapp}/userprofile.json`,
+        USER_STATUS_INDEX_PATH: `${DATA_DOMAIN}/userstatus`,
+        USER_STATUS_PATH: `${DATA_DOMAIN}/${skapp}/userstatus`
       }
 
       // load mysky
       const opts = { dev: DEV_ENABLED }
       this.mySky = await this.client.loadMySky(DATA_DOMAIN, opts)
     } catch (error) {
-      this.log('Failed to load MySky, err: ', error)
+      this.fail(`Failed to load MySky, err:  ${error}`)
       throw error;
     }
   }
@@ -77,14 +81,33 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
     promises.push(this.ensureProfilePresent()
       .then(() => { this.log('Successfully ensured Profile index') })
-      .catch(err => { this.log('Failed to ensure Profile index, err: ', err) })
+      .catch(err => { this.fail(`Failed to ensure Profile index, err: ${err}`) })
     )
 
     promises.push(this.ensurePreferencesPresent()
       .then(() => { this.log('Successfully ensured Preferences index') })
-      .catch(err => { this.log('Failed to ensure Preferences index, err: ', err) }))
-      
-    Promise.all(promises).then(() => { this.fileHierarchyEnsured = true})
+      .catch(err => { this.fail(`Failed to ensure Preferences index, err:  ${err}`) }))
+
+    Promise.all(promises).then(() => { this.fileHierarchyEnsured = true })
+  }
+  // Only set Methods needs to be in DAC
+  public async setUserStatus(status: string): Promise<IDACResponse> {
+    if (!await this.waitUntilFilesArePresent()) {
+      return this.fail('Could not set profile, initialization timeout');
+    }
+
+    try {
+      // validate status value. Must be <= 70 characters
+      // validateProfileStatus(status)
+      const { USER_STATUS_PATH: path } = this.paths;
+      await this.setEntryData(path, status);
+      const { USER_STATUS_INDEX_PATH: pathIndex } = this.paths;
+      await this.setEntryData(pathIndex, status);
+    } catch (error: any) {
+      return this.fail(`setProfile failed, err: ${error.message}`)
+    }
+
+    return { submitted: true }
   }
 
   // Only set Methods needs to be in DAC
@@ -98,7 +121,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       const { PROFILE_PATH: path } = this.paths;
       await this.updateFile(path, profile)
       await this.updateProfileIndex(profile) // TODO added await, ok?
-    } catch (error) {
+    } catch (error: any) {
       return this.fail(`setProfile failed, err: ${error.message}`)
     }
 
@@ -120,7 +143,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       if (current && current.avatar && update.avatar) {
         update.avatar = [...current.avatar, ...update.avatar]
       }
-    } catch (error) {
+    } catch (error: any) {
       return this.fail(`updateProfile failed, err: ${error.message}`)
     }
 
@@ -140,7 +163,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       await this.updateFile(path, prefs)
       await this.updatePreferencesIndex(prefs)
     } catch (error) {
-      this.log('Error occurred trying to record new content, err: ', error)
+      this.fail(`Error occurred trying to record new content, err: ${error}`)
     }
     return { submitted: true }
   }
@@ -174,7 +197,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   }
 
   private async updateProfileIndex(profile: IUserProfile) {
-    const { PROFILE_INDEX_PATH: path } = this.paths;    
+    const { PROFILE_INDEX_PATH: path } = this.paths;
     const index = await this.downloadFile<IProfileIndex>(path);
     if (!index) {
       throw new Error('Profile index not found');
@@ -235,7 +258,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       }
     })
   }
-// downloadFile merely wraps getJSON but is typed in a way that avoids
+  // downloadFile merely wraps getJSON but is typed in a way that avoids
   // repeating the awkward "as unknown as T" everywhere
   private async downloadFile<T>(path: string): Promise<T | null> {
     this.log('downloading file at path', path)
@@ -250,6 +273,40 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
   // updateFile merely wraps setJSON but is typed in a way that avoids repeating
   // the awkwars "as unknown as JsonData" everywhere
+  private async setEntryData(path: string, data: string) {
+    this.log('updating EntryData at path', path, data)
+    const entrydata: Uint8Array = toByteArray(data);
+    this.log(' entrydata (Uint8Array) -  ', JSON.stringify(entrydata))
+    try {
+      await this.mySky.setEntryData(path, entrydata, {allowDeletionEntryData: true});
+    }
+    catch (e) {
+      this.fail(` Error Setting Entry Data ${e}`)
+      throw e;
+    }
+  }
+  // updateFile merely wraps setJSON but is typed in a way that avoids repeating
+  // the awkwars "as unknown as JsonData" everywhere
+  private async getEntryData(path: string) {
+    this.log('reading EntryData at path', path);
+    //this.log('updating file at path(jsonString)', path, jsonString)
+    try {
+      const entryData = await this.mySky.getEntryData(path);
+      if (entryData?.data)
+        return fromByteArray(entryData?.data)
+      else
+        return null;
+    }
+    catch (e) {
+      this.fail(` Error Getting Entry Data ${e}`)
+      return null;
+      //throw e;
+    }
+
+  }
+
+  // updateFile merely wraps setJSON but is typed in a way that avoids repeating
+  // the awkwars "as unknown as JsonData" everywhere
   private async updateFile<T>(path: string, data: T) {
     this.log('updating file at path', path, data)
     await this.mySky.setJSON(path, data as unknown as JsonData)
@@ -259,13 +316,13 @@ export default class UserProfileDAC implements IUserProfileDAC {
   // that indicates failure
   private fail(error: string): IDACResponse {
     this.log(error)
-    return { submitted: false, error}
+    return { submitted: false, error }
   }
 
   // log prints to stdout only if DEBUG_ENABLED flag is set
   private log(message: string, ...optionalContext: any[]) {
     if (DEBUG_ENABLED) {
-      console.log("UserProfileDAC :: "+message, ...optionalContext)
+      console.log("UserProfileDAC :: " + message, ...optionalContext)
     }
   }
 }
