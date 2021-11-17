@@ -370,6 +370,10 @@ export default class UserProfileDAC implements IUserProfileDAC {
       await this.updateFile(path, defaultGlobalPreference, { encypted: false }); // default preferences
       this.globalPreferences = defaultGlobalPreference;
     }
+    else if(!index.skapps || index.skapps.length == 0)//skapps List not present, initiate list
+    {
+      index.skapps = [this.skapp];
+    }
     this.globalPreferences = index;
 
     // ensureSkappPreferences
