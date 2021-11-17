@@ -117,16 +117,17 @@ export interface IPreferencesIndex {
   version: number;
   preferences: IUserPreferences;
   lastUpdatedBy: string;
+  skapps: string[];
   historyLog: IHistoryLog[];
 }
 export interface IProfileOptions {
   ipd?: string,
   skapp?: string
 }
-export interface IUserStatusOptions {
-  skapp?: string,
-  getRealtimeUpdate?: () => IUserStatus;  
-}
+// export interface IUserStatusOptions {
+//   skapp?: string,
+//   onUserStatusChange?: () => IUserStatus;  
+// }
 export interface IPreferencesOptions {
   skapp?: string
 }

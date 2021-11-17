@@ -205,13 +205,12 @@ export default class UserProfileDAC implements IUserProfileDAC {
       }
       // if global privacy is public
       if (globalUserStatusPrivacy === PrivacyType.PUBLIC) {
-        // update GLOBAL lastSeen value
-        let userStatus: IUserStatus = DEFAULT_USER_STATUS;
-        userStatus.lastSeen = globalUserStatuslastSeenPrivacy == LastSeenPrivacyType.PUBLIC_TS ? new Date().getTime() : 0;
-        const globalUserStatusEntryData: string = this.prepareGlobalUserStatusEntryData(userStatus, false);
-        await this.setEntryData(pathIndex, globalUserStatusEntryData);
-       // if skapp privacy is public
+        // if skapp privacy is public
         if (skappUserStatusPrivacy === PrivacyType.PUBLIC) {
+          if(status == StatusType.NONE)
+          {
+            status = StatusType.ONLINE;
+          }
           // set user's Skapp specific status
           const userStatus: IUserStatus = {
             status: status,
@@ -226,6 +225,11 @@ export default class UserProfileDAC implements IUserProfileDAC {
           const skappUserStatusEntryData: string = this.prepareUserStatusEntryData(userStatus, false);
           await this.setEntryData(path, skappUserStatusEntryData);
         }
+        // update GLOBAL lastSeen value. we need to update global lastseen last so that its always greater than any skapp's lastSeen value.
+        let userStatus: IUserStatus = DEFAULT_USER_STATUS;
+        userStatus.lastSeen = globalUserStatuslastSeenPrivacy == LastSeenPrivacyType.PUBLIC_TS ? new Date().getTime() : 0;
+        const globalUserStatusEntryData: string = this.prepareGlobalUserStatusEntryData(userStatus, false);
+        await this.setEntryData(pathIndex, globalUserStatusEntryData);
       }
       else {
         // if global userstatus preference is "not public" set value to "None|0"
@@ -305,6 +309,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     }
     // TODO validate preferences
     try {
+      // Get Preferences
+      // Update Preferences in JSON
+      // Update Index
       const updatedIndex = await this.updatePreferencesIndex(prefs)
       this.globalPreferences = updatedIndex;
     } catch (error) {
@@ -321,6 +328,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     }
     // TODO validate preferences
     try {
+      // Get Preferences
+      // Update Preferences in JSON
+      // Update Index
       const { PREFERENCES_PATH: path } = this.paths;
       await this.updateFile(path, prefs, { encypted: false })
       this.skappPreferences = prefs;
@@ -354,6 +364,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
         version: VERSION,
         preferences: DEFAULT_PREFERENCES,
         lastUpdatedBy: this.skapp,
+        skapps: [this.skapp],
         historyLog: []
       };
       await this.updateFile(path, defaultGlobalPreference, { encypted: false }); // default preferences
@@ -364,9 +375,9 @@ export default class UserProfileDAC implements IUserProfileDAC {
     // ensureSkappPreferences
     const { PREFERENCES_PATH: skappPath } = this.paths;
     const skappPreferences = await this.downloadFile<IUserPreferences>(skappPath);
-    this.log(">>>>>>> ensureSkappPreferences 1 <<<<<<< " + JSON.stringify(skappPreferences))
+    //this.log(">>>>>>> ensureSkappPreferences 1 <<<<<<< " + JSON.stringify(skappPreferences))
     if (!skappPreferences) {
-      this.log(">>>>>>> ensureSkappPreferences 2(inside) <<<<<<< " + skappPreferences)
+      //this.log(">>>>>>> ensureSkappPreferences 2(inside) <<<<<<< " + skappPreferences)
       await this.updateFile(skappPath, DEFAULT_PREFERENCES, { encypted: false }); // default preferences
       this.skappPreferences = DEFAULT_PREFERENCES;
     }
@@ -402,7 +413,15 @@ export default class UserProfileDAC implements IUserProfileDAC {
     if (!index.historyLog) {
       index.historyLog = []
     }
-
+    if (!index.skapps) {
+      let skapps = [this.skapp];
+      index.skapps = skapps
+    }
+    else
+    {
+      if(!index.skapps.includes(this.skapp))
+        index.skapps.push(this.skapp);
+    }
     index.preferences = prefs;
     index.lastUpdatedBy = this.skapp;
     index.historyLog.push({
