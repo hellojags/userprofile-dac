@@ -388,7 +388,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
         index.skapps = [this.skapp];
         changes = true;
       }
-      else {
+      else if (!index.skapps.includes(this.skapp)) {
         index.skapps.push(this.skapp);
         changes = true;
       }
@@ -410,10 +410,36 @@ export default class UserProfileDAC implements IUserProfileDAC {
 
     // ensureSkappPreferences
     const { PREFERENCES_PATH: skappPath } = this.paths;
-    const skappPreferences = await this.downloadFile<IUserPreferences>(skappPath);
+    let skappPreferences = await this.downloadFile<IUserPreferences>(skappPath);
     if (!skappPreferences) {
       await this.updateFile(skappPath, DEFAULT_PREFERENCES, { encypted: false }); // default preferences
       this.skappPreferences = DEFAULT_PREFERENCES;
+    }
+    else {
+      let changes = false;
+      // check for darkmode
+      if (!skappPreferences.darkmode) {
+        skappPreferences.darkmode = false;
+        changes = true;
+      }
+      // check for portal
+      if (!skappPreferences.portal) {
+        skappPreferences.portal = "https://siasky.net/";
+        changes = true;
+      }
+      // check for userStatus
+      if (!skappPreferences.userStatus) {
+        const userStatusPreferences: IUserStatusPreferences = {
+          statusPrivacy: "Private",
+          lastSeenPrivacy: "Private",
+          updatefrequency: 0
+        }
+        skappPreferences.userStatus = userStatusPreferences;
+        changes = true;
+      }
+      if (changes) {
+        await this.updateFile(skappPath, skappPreferences, { encypted: false }); // default preferences
+      }
     }
     this.skappPreferences = skappPreferences;
   }
