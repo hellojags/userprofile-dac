@@ -22,6 +22,7 @@ import {
 } from "./types";
 import { validateProfile } from "./validation";
 import { Buffer } from "buffer";
+import { IUserStatusPreferences } from '../dist/types.d';
 const DATA_DOMAIN = "profile-dac.hns";
 //const DATA_DOMAIN = "support-dac.hns";
 
@@ -207,8 +208,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
       if (globalUserStatusPrivacy === PrivacyType.PUBLIC) {
         // if skapp privacy is public
         if (skappUserStatusPrivacy === PrivacyType.PUBLIC) {
-          if(status == StatusType.NONE)
-          {
+          if (status == StatusType.NONE) {
             status = StatusType.ONLINE;
           }
           // set user's Skapp specific status
@@ -219,7 +219,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
           const skappUserStatusEntryData: string = this.prepareUserStatusEntryData(userStatus, false);
           await this.setEntryData(path, skappUserStatusEntryData);
         }
-        else{
+        else {
           // if Skapp userstatus preference is "not public" set value to "None|0"
           let userStatus: IUserStatus = DEFAULT_USER_STATUS;
           const skappUserStatusEntryData: string = this.prepareUserStatusEntryData(userStatus, false);
@@ -358,7 +358,7 @@ export default class UserProfileDAC implements IUserProfileDAC {
   private async ensurePreferencesPresent(): Promise<void> {
     // ensureGLobalPreferences
     const { PREFERENCES_INDEX_PATH: path } = this.paths;
-    const index = await this.downloadFile<IPreferencesIndex>(path);
+    let index = await this.downloadFile<IPreferencesIndex>(path);
     if (!index) {
       const defaultGlobalPreference = {
         version: VERSION,
@@ -370,18 +370,48 @@ export default class UserProfileDAC implements IUserProfileDAC {
       await this.updateFile(path, defaultGlobalPreference, { encypted: false }); // default preferences
       this.globalPreferences = defaultGlobalPreference;
     }
-    else if(!index.skapps || index.skapps.length == 0)//skapps List not present, initiate list
-    {
-      index.skapps = [this.skapp];
+    else {
+      let changes = false;
+      // check for darkmode
+      if (!index.preferences.darkmode) {
+        index.preferences.darkmode = false;
+        changes = true;
+      }
+      // check for portal
+      if (!index.preferences.portal) {
+        index.preferences.portal = "https://siasky.net/";
+        changes = true;
+      }
+      // check for Skapps List
+      if ((!index.skapps) || index.skapps.length == 0)//skapps List not present, initiate list
+      {
+        index.skapps = [this.skapp];
+        changes = true;
+      }
+      else {
+        index.skapps.push(this.skapp);
+        changes = true;
+      }
+      // check for userStatus
+      if (!index.preferences.userStatus) {
+        const userStatusPreferences: IUserStatusPreferences = {
+          statusPrivacy: "Private",
+          lastSeenPrivacy: "Private",
+          updatefrequency: 0
+        }
+        index.preferences.userStatus = userStatusPreferences;
+        changes = true;
+      }
+      if (changes) {
+        await this.updateFile(path, index, { encypted: false }); // default preferences
+      }
     }
     this.globalPreferences = index;
 
     // ensureSkappPreferences
     const { PREFERENCES_PATH: skappPath } = this.paths;
     const skappPreferences = await this.downloadFile<IUserPreferences>(skappPath);
-    //this.log(">>>>>>> ensureSkappPreferences 1 <<<<<<< " + JSON.stringify(skappPreferences))
     if (!skappPreferences) {
-      //this.log(">>>>>>> ensureSkappPreferences 2(inside) <<<<<<< " + skappPreferences)
       await this.updateFile(skappPath, DEFAULT_PREFERENCES, { encypted: false }); // default preferences
       this.skappPreferences = DEFAULT_PREFERENCES;
     }
@@ -421,9 +451,8 @@ export default class UserProfileDAC implements IUserProfileDAC {
       let skapps = [this.skapp];
       index.skapps = skapps
     }
-    else
-    {
-      if(!index.skapps.includes(this.skapp))
+    else {
+      if (!index.skapps.includes(this.skapp))
         index.skapps.push(this.skapp);
     }
     index.preferences = prefs;
